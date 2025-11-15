@@ -2,89 +2,74 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
+# URL страницы с новостями
+url = "https://web.archive.org/web/20230903112115/https://iz.ru/news"
 
-class NewsParser:
+# Получаем HTML страницы
+response = requests.get(url)
+soup = BeautifulSoup(response.text, "html.parser")
 
-    def __init__(self):
-        self.URL = "https://web.archive.org/web/20230903112115/https://iz.ru/news"
-        self.ERROR_MESSAGE = "Error loading page!"
-        self.news_data = self.__parse_news_page()
+# Словарь для хранения новостей по категориям
+news_by_category = {}
 
-    def __parse_news_page(self):
+# Ищем все новостные блоки
+news_items = soup.find_all("div", class_="node__cart__item")
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-        }
+for item in news_items:
+    # Извлекаем категорию
+    category_div = item.find("div", class_="node__cart__item__category_news")
+    if category_div:
+        category_link = category_div.find("a")
+        if category_link:
+            category = category_link.get_text().strip()
+        else:
+            category = category_div.get_text().strip()
 
-        try:
-            response = requests.get(self.URL, headers=headers, timeout=10)
-            if response.status_code != 200:
-                return {"Error": self.ERROR_MESSAGE}
+        # Извлекаем заголовок и ссылку
+        title_div = item.find("div", class_="node__cart__item__inside__info__title")
+        link_tag = item.find("a", href=True)
 
-        except requests.exceptions.RequestException as e:
-            return {"Error": str(e)}
+        if title_div and link_tag:
+            title = title_div.get_text().strip()
+            link = link_tag["href"]
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        news_by_category = {}
+            # Преобразуем относительную ссылку в абсолютную
+            if link.startswith("/"):
+                link = f"https://iz.ru{link}"
 
-        # Основные категории для поиска
-        categories = [
-            "Общество",
-            "Политика",
-            "Экономика",
-            "Спорт",
-            "Здоровье",
-            "Культура",
-        ]
+            # Добавляем новость в соответствующую категорию
+            if category not in news_by_category:
+                news_by_category[category] = []
 
-        for category in categories:
-            news_list = self.__find_news_by_category(soup, category)
-            if news_list:
-                news_by_category[category] = news_list
+            news_item = {"title": title, "link": link}
 
-        return news_by_category
+            # Проверяем на дубликаты
+            if news_item not in news_by_category[category]:
+                news_by_category[category].append(news_item)
 
-    def __find_news_by_category(self, soup, category):
-        news_list = []
+# Выводим результат
+print("Новости по категориям:")
+print("=" * 60)
 
-        # Ищем элементы, связанные с категорией
-        elements = soup.find_all(
-            class_=lambda x: x and category.lower() in str(x).lower()
-        )
+for category, news_list in news_by_category.items():
+    print(f"\n{category.upper()}:")
+    print("-" * 40)
+    for i, news in enumerate(news_list, 1):
+        print(f"{i}. {news['title']}")
+        print(f"   🔗 {news['link']}")
 
-        for element in elements:
-            # Ищем новости внутри элемента категории
-            links = element.find_all("a", href=lambda x: x and "/news/" in x)
+# Сохраняем в JSON файл
+with open("iz_news.json", "w", encoding="utf-8") as f:
+    json.dump(news_by_category, f, ensure_ascii=False, indent=2)
 
-            for link in links:
-                title = link.get_text().strip()
-                href = link.get("href")
+# Статистика
+total_categories = len(news_by_category)
+total_news = sum(len(news_list) for news_list in news_by_category.values())
 
-                if title and len(title) > 15:
-                    full_url = (
-                        href if href.startswith("http") else f"https://iz.ru{href}"
-                    )
+print(f"\n✅ Данные сохранены в iz_news.json")
+print(f"📊 Статистика: {total_categories} категорий, {total_news} новостей")
 
-                    news_list.append({"title": title, "link": full_url})
-
-        return news_list[:5]  # Ограничиваем количество
-
-
-if __name__ == "__main__":
-    parser = NewsParser()
-
-    print("Новости с Iz.ru:")
-    print("=" * 60)
-
-    for category, news_list in parser.news_data.items():
-        print(f"\n{category}:")
-        print("-" * 40)
-        for i, news in enumerate(news_list, 1):
-            print(f"{i}. {news['title']}")
-            print(f"   Ссылка: {news['link']}")
-
-    # Сохраняем в JSON
-    with open("iz_news.json", "w", encoding="utf-8") as f:
-        json.dump(parser.news_data, f, ensure_ascii=False, indent=2)
-    print("\n✅ Данные сохранены в iz_news.json")
+# Дополнительная информация о категориях
+print("\n📈 Категории и количество новостей:")
+for category, news_list in news_by_category.items():
+    print(f"   {category}: {len(news_list)} новостей")
