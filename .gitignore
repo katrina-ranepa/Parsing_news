@@ -7,6 +7,5 @@ venv/
 .idea/
 
 
-# Project files
-*.json
+# Project file
 *.log
