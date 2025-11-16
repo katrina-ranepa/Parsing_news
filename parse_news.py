@@ -6,24 +6,28 @@ import json
 url = "https://web.archive.org/web/20230903112115/https://iz.ru/news"
 
 # Получаем HTML страницы
-response = requests.get(url)
-soup = BeautifulSoup(response.text, "html.parser")
+response = requests.get(url)#загружает HTML-страницу
+soup = BeautifulSoup(response.text, "html.parser")  # создает объект для парсинга
 
 # Словарь для хранения новостей по категориям
 news_by_category = {}
 
 # Ищем все новостные блоки
-news_items = soup.find_all("div", class_="node__cart__item")
+news_items = soup.find_all("div", class_="node__cart__item")#Находим ВСЕ новостные блоки по CSS-классу
 
 for item in news_items:
     # Извлекаем категорию
-    category_div = item.find("div", class_="node__cart__item__category_news")
-    if category_div:
+    category_div = item.find("div", class_="node__cart__item__category_news")#Если найден - возвращает объект BeautifulSoup
+
+    # Если не найден - возвращает None
+    if (category_div):  # Проверяет, был ли найден блок с категорией/Если category_div не None - выполняет код внутри условия/Если category_div равен None - пропускает весь блок (новость без категории)
         category_link = category_div.find("a")
         if category_link:
             category = category_link.get_text().strip()
+          # strip() убирает лишние пробелы
         else:
             category = category_div.get_text().strip()
+             # Если есть ссылка - берем текст из ссылки, иначе - из самого div
 
         # Извлекаем заголовок и ссылку
         title_div = item.find("div", class_="node__cart__item__inside__info__title")
@@ -39,7 +43,7 @@ for item in news_items:
 
             # Добавляем новость в соответствующую категорию
             if category not in news_by_category:
-                news_by_category[category] = []
+                news_by_category[category] = []#создает новую катеогрию.елси такой еще нет
 
             news_item = {"title": title, "link": link}
 
@@ -49,7 +53,7 @@ for item in news_items:
 
 # Выводим результат
 print("Новости по категориям:")
-print("=" * 60)
+print("=" * 60)  # Создает строку из 60 символов = и выводит ее.
 
 for category, news_list in news_by_category.items():
     print(f"\n{category.upper()}:")
@@ -60,7 +64,9 @@ for category, news_list in news_by_category.items():
 
 # Сохраняем в JSON файл
 with open("iz_news.json", "w", encoding="utf-8") as f:
-    json.dump(news_by_category, f, ensure_ascii=False, indent=2)
+    json.dump(
+        news_by_category, f, ensure_ascii=False, indent=2
+    )  # ensure_ascii=False - сохраняет кириллицу правильно/indent=2 - делает JSON читаемым
 
 # Статистика
 total_categories = len(news_by_category)
